@@ -6,7 +6,28 @@
 
 ---
 
-## ⚠️ Safety First
+## ⚠️ CRITICAL WARNING: Kernel Removal Risk
+
+**DO NOT run `apt autoremove -y` blindly!**
+
+Always run this FIRST to see what will be removed:
+```bash
+sudo apt autoremove --dry-run
+```
+
+**If you see kernel images being removed, STOP:**
+- `linux-image-*`
+- `linux-headers-*`
+- `vmlinuz-*`
+
+**DO NOT proceed** unless you're certain you have other bootable kernels available.
+
+### Lesson Learned the Hard Way:
+Running `sudo apt autoremove -y` without checking removed the only bootable kernel, leaving the system unable to boot. This requires recovery from a live USB/ISO.
+
+---
+
+## Safety First
 
 This guide includes **potentially destructive commands**. Read each section fully before executing. Always run dry-run versions first.
 
@@ -83,20 +104,21 @@ sudo apt purge gcc -y  # Only if you don't need compilation!
 apt list --installed | grep -E 'wine|windows|msvc|build' | head -20
 ```
 
-### Step 2.2: Remove all orphaned dependencies
+### Step 2.2: Remove all orphaned dependencies (SAFE WAY)
 
 ```bash
-# Find packages no longer needed
-sudo apt autoremove -y
-
-# More aggressive: remove unused libraries
-sudo apt autoremove --purge -y
-
-# Show what will be removed (dry run)
+# ALWAYS DO THIS FIRST - See what will be removed
 sudo apt autoremove --dry-run
 
-# Actually remove it
+# Read the output carefully! If kernel images appear, STOP here.
+
+# Only proceed if nothing critical is being removed
 sudo apt autoremove -y
+
+# More aggressive: remove unused libraries (also check first!)
+sudo apt autoremove --purge --dry-run
+# Then if safe:
+sudo apt autoremove --purge -y
 ```
 
 ### Step 2.3: Clean package cache
@@ -266,7 +288,16 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# Phase 1: Package cleanup
+# Phase 1: Package cleanup (WITH SAFETY CHECK)
+echo "Checking what will be removed..."
+sudo apt autoremove --dry-run
+read -p "Does this look safe? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborting - no packages removed"
+    exit 1
+fi
+
 echo "Removing orphaned packages..."
 sudo apt autoremove -y
 sudo apt autoclean -y
@@ -322,6 +353,9 @@ chmod +x ~/cleanup.sh
 # ❌ Removes boot files
 # sudo rm -rf /boot
 
+# ❌ Removes kernel without checking (THIS IS THE KILLER!)
+# sudo apt autoremove -y  # WITHOUT --dry-run first!
+
 # ❌ Clears all logs, might hide errors
 # sudo truncate -s 0 /var/log/*
 
@@ -331,6 +365,59 @@ chmod +x ~/cleanup.sh
 # ❌ Removes critical system libraries
 # sudo apt purge libc6
 ```
+
+---
+
+## RECOVERY: If You Removed Your Kernel (Like I Did)
+
+### Symptoms:
+- System won't boot
+- GRUB loads but kernel not found
+- Error: "No bootable kernel"
+
+### Recovery Steps:
+
+**Step 1: Create a bootable Debian live USB**
+```bash
+# Download Debian 13 ISO from https://www.debian.org/download
+# Use Etcher or similar tool to write ISO to USB
+# Reboot and boot from the USB (press F12, F2, ESC, or DEL during startup)
+```
+
+**Step 2: Once in the live system, open a terminal and run:**
+
+```bash
+# Find your Debian root partition
+lsblk
+# Look for your main partition (usually /dev/sda3, NOT the Windows partition /dev/sda2)
+
+# Mount your Debian root partition (replace sda3 with yours)
+sudo mount /dev/sda3 /mnt
+
+# If /boot is on a separate partition, mount that too
+sudo mount /dev/sda1 /mnt/boot  # Common for EFI systems
+
+# Enter your system environment
+sudo chroot /mnt
+
+# Reinstall the kernel
+apt install --reinstall linux-image-amd64 linux-headers-amd64 -y
+
+# Rebuild GRUB
+grub-install /dev/sda
+update-grub
+
+# Exit and reboot
+exit
+sudo reboot
+```
+
+**Step 3: Boot normally**
+- Remove USB and reboot
+- You should see GRUB menu with both Debian and Windows
+- Select Debian and boot normally
+
+Your data is **completely intact** - only the kernel binary is missing and gets reinstalled.
 
 ---
 
@@ -385,7 +472,7 @@ sudo apt install wine wine32 wine64 -y
 ## Recommended Cleanup Frequency
 
 - **Weekly:** Run `apt autoclean` and cache cleanup
-- **Monthly:** Full cleanup script
+- **Monthly:** Full cleanup script (WITH --dry-run FIRST!)
 - **Quarterly:** Remove old log files and rebuild package cache
 
 ---
@@ -393,10 +480,10 @@ sudo apt install wine wine32 wine64 -y
 ## Final Tips
 
 1. **Always back up** before major cleanup
-2. **Run dry-run versions** first (--dry-run flag)
+2. **Run dry-run versions** first (--dry-run flag) - THIS IS CRITICAL FOR apt autoremove
 3. **One phase at a time** - don't rush
 4. **Monitor disk space** after each phase
 5. **Keep system updates current** after cleanup
+6. **Never blindly run apt autoremove** - always check what's being removed first
 
 Good luck! 🚀
-
