@@ -211,6 +211,27 @@ find ~ -name "node_modules" -type d 2>/dev/null  # Node packages
 # rm -rf ~/node-learning/node_modules
 ```
 
+### Step 4.1: Remove Android/Gradle build metadata
+
+```bash
+# Find and remove .properties files (build metadata)
+echo "=== Gradle/Build .properties files found ==="
+find ~ -name "*.properties" -path "*/build/*" 2>/dev/null
+
+# Remove play-services and similar build artifacts
+echo "=== Google Play Services metadata found ==="
+find ~ -name "play-services-*" 2>/dev/null
+
+# Safe cleanup of build metadata
+find ~/Downloads -name "*.properties" -delete
+find ~/Downloads -name "play-services-*" -delete
+find ~/.gradle -name "*.properties" -delete 2>/dev/null  # If gradle cache exists
+
+# More aggressive (if you're done with Android development)
+# rm -rf ~/.gradle/
+# rm -rf ~/.m2/repository/
+```
+
 ---
 
 ## Phase 5: Optimize System Services
@@ -317,6 +338,11 @@ sudo find /var/log -type f -name "*.log" -mtime +30 -delete
 # Phase 4: Temp cleanup
 echo "Cleaning temporary files..."
 sudo find /tmp -type f -atime +10 -delete 2>/dev/null
+
+# Phase 5: Build artifacts cleanup
+echo "Removing build metadata..."
+find ~/Downloads -name "*.properties" -delete 2>/dev/null
+find ~/Downloads -name "play-services-*" -delete 2>/dev/null
 
 echo ""
 echo "=== Cleanup Complete ==="
